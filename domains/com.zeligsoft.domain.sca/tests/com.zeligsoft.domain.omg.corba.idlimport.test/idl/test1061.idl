@@ -1,9 +1,0 @@
-// Struct with nonsense body
-
-interface int1061
-{
-  struct s1
-  {
-     Blahblahblah c;
-  };
-};
