@@ -37,6 +37,8 @@ import com.zeligsoft.base.zdl.util.ZDLUtil;
 import com.zeligsoft.domain.dds4ccm.Activator;
 import com.zeligsoft.domain.dds4ccm.DDS4CCMNames;
 import com.zeligsoft.domain.dds4ccm.DDS4CCMPreferenceConstants;
+import com.zeligsoft.domain.dds4ccm.utils.DDS4CCMUtil;
+import com.zeligsoft.domain.dds4ccm.utils.ModelTypeDDS4CCM;
 import com.zeligsoft.domain.omg.ccm.CCMNames;
 import com.zeligsoft.domain.omg.ccm.util.CCMUtil;
 import com.zeligsoft.domain.omg.corba.CORBADomainNames;
@@ -135,36 +137,37 @@ public class DDS4CCMXtendUtils {
 		if (ZDeploymentUtil.getDeploymentTargetPart(deploymentPart) == null) {
 			return false;
 		}
+		if(DDS4CCMUtil.getModelType(definition).equals(ModelTypeDDS4CCM.ATCD.name())){
+			for (Port sourcePort : definition.getOwnedPorts()) {
+				// AMI connection is covered during the AMI connection generation
+				// so we can safely ignore.
+				boolean isAync = (Boolean) ZDLUtil.getValue(sourcePort,
+						CCMNames.INTERFACE_PORT,
+						CCMNames.INTERFACE_PORT__IS_ASYNCHRONOUS);
+				if (isAync) {
+					continue;
+				}
 
-		for (Port sourcePort : definition.getOwnedPorts()) {
-			// AMI connection is covered during the AMI connection generation
-			// so we can safely ignore.
-			boolean isAync = (Boolean) ZDLUtil.getValue(sourcePort,
-					CCMNames.INTERFACE_PORT,
-					CCMNames.INTERFACE_PORT__IS_ASYNCHRONOUS);
-			if (isAync) {
-				continue;
-			}
+				// Ignore extended port that connected to data space
+				if (!ZDLUtil.isZDLConcept(sourcePort.getType(),
+						CORBADomainNames.CORBAINTERFACE)) {
+					continue;
+				}
 
-			// Ignore extended port that connected to data space
-			if (!ZDLUtil.isZDLConcept(sourcePort.getType(),
-					CORBADomainNames.CORBAINTERFACE)) {
-				continue;
-			}
+				boolean conjugation = (Boolean) ZDLUtil.getValue(sourcePort,
+						ZMLMMNames.CONJUGATED_PORT,
+						ZMLMMNames.CONJUGATED_PORT__IS_CONJUGATED);
+				
+				List<Property> connectedEnds = new ArrayList<Property>();
+				getConnectedEnds(!conjugation, sourcePort, deploymentPart,
+						new ArrayList<Connector>(), new ArrayList<EObject>(),
+						connectedEnds);
 
-			boolean conjugation = (Boolean) ZDLUtil.getValue(sourcePort,
-					ZMLMMNames.CONJUGATED_PORT,
-					ZMLMMNames.CONJUGATED_PORT__IS_CONJUGATED);
-			
-			List<Property> connectedEnds = new ArrayList<Property>();
-			getConnectedEnds(!conjugation, sourcePort, deploymentPart,
-					new ArrayList<Connector>(), new ArrayList<EObject>(),
-					connectedEnds);
-
-			for (Property p : connectedEnds) {
-				// if connected part is not deployed then generate.
-				if (ZDeploymentUtil.getDeploymentTargetPart(p) == null) {
-					return true;
+				for (Property p : connectedEnds) {
+					// if connected part is not deployed then generate.
+					if (ZDeploymentUtil.getDeploymentTargetPart(p) == null) {
+						return true;
+					}
 				}
 			}
 		}
